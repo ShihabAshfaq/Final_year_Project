@@ -1,0 +1,48 @@
+//Checking if mlx90640 is working or not
+sudo raspi-config
+interface options -> i2c -> enable
+sudo reboot
+
+sudo apt update
+sudo apt install -y i2c-tools
+i2cdetect -y 1
+device was listed at 0x33, which means the cam was properly connected.
+
+//Downloading stuff for the thermal cam
+sudo apt install -y python3-venv
+python3 -m venv mlx-env
+source mlx-env/bin/activate
+pip install adafruit-circuitpython-mlx90640
+pip install lgpio
+
+
+//running test script inside environment
+vi mlx_test.py
+
+import time
+import board
+import busio
+import adafruit_mlx90640
+
+# Set up I2C connection
+i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
+
+# Initialize the MLX90640 sensor
+mlx = adafruit_mlx90640.MLX90640(i2c)
+print("MLX90640 serial number:", [hex(i) for i in mlx.serial_number])
+
+mlx.refresh_rate = adafruit_mlx90640.RefreshRate.REFRESH_2_HZ
+
+frame = [0] * 768
+
+# Read and print thermal data
+while True:
+    try:
+        mlx.getFrame(frame)
+        print("Center pixel temperature:", frame[384])  # Roughly center
+        time.sleep(0.5)
+    except ValueError:
+        continue
+
+//code above from gpt
+
