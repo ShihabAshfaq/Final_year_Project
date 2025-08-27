@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# Flask / data
+instance/
+uv_dashboard.db
+*.db
+*.sqlite
+
+# Tests & caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.cache/
+
+# Logs
+*.log
+logs/
+
+# Editors & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# (future) Node
+node_modules/
+dist/
