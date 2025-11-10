@@ -30,6 +30,16 @@ function withinBand(arr, target, tol) {
   const ok = clean.filter(v => v>=target-tol && v<=target+tol).length;
   return ok/clean.length;
 }
+function formatSeconds(s) {
+  if (s == null) return '--';
+  const sec = Math.max(0, Math.floor(s));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const ss = sec % 60;
+  return h.toString().padStart(2,'0') + ':' + 
+         m.toString().padStart(2,'0') + ':' + 
+         ss.toString().padStart(2,'0');
+}
 function updateTHStats(temp, hum) {
   const sT = stats(temp), sH = stats(hum);
   document.getElementById('stat-temp-avg').textContent = num(sT.avg, 1) + ' °C';
@@ -102,7 +112,11 @@ async function fetchState() {
       btn.classList.add('bg-gray-100','hover:bg-gray-200');
     }
   });
+
+  // Update shopping list
+  renderShoppingList(data.actuators || {}, data.timers || {}, data.mode);
 }
+
 
 async function fetchHistory() {
   const res = await fetch('/api/history?minutes=60');
@@ -204,6 +218,106 @@ async function toggleActuator(name) {
   });
   const j = await res.json();
   if (j.error) alert(j.error);
+  fetchState();
+}
+
+// ---------- Shopping-list manual controls ----------
+function renderShoppingList(actuators, timers, mode) {
+  const ul = document.getElementById('shopping-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+
+  if (mode !== 'manual') {
+    const li = document.createElement('li');
+    li.className = 'text-gray-500 text-sm';
+    li.textContent = 'Switch to Manual mode to manage this list.';
+    ul.appendChild(li);
+    return;
+  }
+
+  const names = ['humidifier', 'dehumidifier', 'heater', 'cooler'];
+  const items = [];
+  names.forEach(name => {
+    const a = actuators[name] || { on: false };
+    const t = timers[name] || { active: false };
+    if (a.on || t.active) {
+      items.push({
+        name,
+        on: !!a.on,
+        timerActive: !!t.active,
+        remaining_s: t.remaining_s
+      });
+    }
+  });
+
+  if (items.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'text-gray-400';
+    li.textContent = 'No items';
+    ul.appendChild(li);
+    return;
+  }
+
+  items.forEach(it => {
+    const li = document.createElement('li');
+    li.className = 'flex items-center justify-between p-3 rounded-xl bg-gray-50';
+
+    const left = document.createElement('div');
+    left.className = 'flex items-center gap-2';
+
+    const dot = document.createElement('span');
+    dot.className = 'inline-block w-2.5 h-2.5 rounded-full ' + 
+      (it.on ? 'bg-emerald-500' : 'bg-gray-300');
+    left.appendChild(dot);
+
+    const title = document.createElement('span');
+    title.className = 'font-medium';
+    title.textContent = it.name;
+    left.appendChild(title);
+
+    if (it.timerActive) {
+      const chip = document.createElement('span');
+      chip.className = 'ml-2 text-xs px-2 py-1 rounded bg-blue-100 text-blue-800';
+      chip.textContent = `timer ${formatSeconds(it.remaining_s)}`;
+      left.appendChild(chip);
+    } else if (it.on) {
+      const chip = document.createElement('span');
+      chip.className = 'ml-2 text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-800';
+      chip.textContent = 'on';
+      left.appendChild(chip);
+    }
+
+    const del = document.createElement('button');
+    del.className = 'text-sm px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700';
+    del.textContent = 'Delete';
+    del.addEventListener('click', () => deleteShoppingItem(it.name, it.timerActive));
+
+    li.appendChild(left);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+}
+
+async function deleteShoppingItem(name, timerActive) {
+  if (timerActive) {
+    const res = await fetch(`/api/actuators/${name}/cancel_timer`, { method: 'POST' });
+    const j = await res.json();
+    if (!j.ok) {
+      alert(j.error || 'Failed to cancel timer');
+      return;
+    }
+  } else {
+    const res = await fetch(`/api/actuators/${name}/toggle`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ on: false })
+    });
+    const j = await res.json();
+    if (!j.ok) {
+      alert(j.error || 'Failed to turn off actuator');
+      return;
+    }
+  }
   fetchState();
 }
 
